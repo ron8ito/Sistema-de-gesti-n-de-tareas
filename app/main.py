@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from pydantic import BaseModel
 from app.database.connection import SessionLocal
 from sqlalchemy import text
@@ -7,8 +7,12 @@ app = FastAPI()
 
 
 class Tarea(BaseModel):
-    titulo: str
-    usuario_id: int
+     titulo: str
+     usuario_id: int
+     descripcion: str
+     fecha_vencimiento: str
+     estado: str
+     
 
 @app.get("/")
 def inicio():
@@ -16,17 +20,24 @@ def inicio():
 
 # 🔹 GET
 @app.get("/tareas")
-def obtener_tareas():
+def obtener_tareas(usuario_id: int = Query(None)):
     db = SessionLocal()
 
-    result = db.execute(text("SELECT * FROM tareas")).fetchall()
+    if usuario_id:
+        query = "SELECT * FROM tareas WHERE usuario_id = :usuario_id"
+        result = db.execute(text(query), {"usuario_id": usuario_id}).fetchall()
+    else:
+        result = db.execute(text("SELECT * FROM tareas")).fetchall()
 
     tareas = []
     for row in result:
         tareas.append({
             "id": row[0],
             "titulo": row[1],
-            "usuario_id": row[2]
+            "usuario_id": row[2],
+            "descripcion": row[3],
+            "fecha_vencimiento": row[4],
+            "estado": row[5],
         })
 
     db.close()
@@ -38,10 +49,18 @@ def obtener_tareas():
 def crear_tarea(tarea: Tarea):
     db = SessionLocal()
 
-    query = "INSERT INTO tareas (titulo, usuario_id) VALUES (:titulo, :usuario_id)"
+    query = """
+    INSERT INTO tareas (titulo, usuario_id, descripcion, fecha_vencimiento, estado)
+    VALUES (:titulo, :usuario_id, :descripcion, :fecha_vencimiento, :estado)
+    """
+
     db.execute(text(query), {
         "titulo": tarea.titulo,
-        "usuario_id": 1
+        "usuario_id": tarea.usuario_id,
+        "descripcion": tarea.descripcion,
+        "fecha_vencimiento": tarea.fecha_vencimiento,
+        "estado": tarea.estado,
+        
     })
 
     db.commit()
