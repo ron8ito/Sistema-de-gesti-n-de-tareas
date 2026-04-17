@@ -1,7 +1,9 @@
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Header, HTTPException
 from pydantic import BaseModel
-from app.database.connection import SessionLocal
 from sqlalchemy import text
+from jose import jwt
+from datetime import datetime, timedelta
+from app.database.connection import SessionLocal
 
 app = FastAPI()
 
@@ -45,29 +47,38 @@ def obtener_tareas(usuario_id: int = Query(None)):
     return tareas
 
 # 🔹 POST
+
+from fastapi import Header, HTTPException
+
+from fastapi import Query
+
 @app.post("/tareas")
-def crear_tarea(tarea: Tarea):
+def crear_tarea(tarea: Tarea, token: str = Query(None)):
+
+    if not token:
+        raise HTTPException(status_code=401, detail="No autorizado")
+
+    usuario_id = verificar_token(token)
+
     db = SessionLocal()
 
     query = """
-    INSERT INTO tareas (titulo, usuario_id, descripcion, fecha_vencimiento, estado)
-    VALUES (:titulo, :usuario_id, :descripcion, :fecha_vencimiento, :estado)
+    INSERT INTO tareas (titulo, descripcion, fecha_vencimiento, estado, usuario_id)
+    VALUES (:titulo, :descripcion, :fecha_vencimiento, :estado, :usuario_id)
     """
 
     db.execute(text(query), {
         "titulo": tarea.titulo,
-        "usuario_id": tarea.usuario_id,
         "descripcion": tarea.descripcion,
         "fecha_vencimiento": tarea.fecha_vencimiento,
         "estado": tarea.estado,
-        
+        "usuario_id": usuario_id
     })
 
     db.commit()
     db.close()
 
     return {"mensaje": "Tarea creada"}
-
 # 🔹 PUT (actualizar)
 @app.put("/tareas/{id}")
 def actualizar_tarea(id: int, tarea: Tarea):
@@ -136,9 +147,30 @@ def login(usuario: Usuario):
     db.close()
 
     if result:
+        token = crear_token({"user_id": result[0]})
+
         return {
             "mensaje": "Login exitoso",
-            "usuario_id": result[0]
+            "access_token": token
         }
     else:
-        return {"error": "Credenciales incorrectas"}
+        raise HTTPException(status_code=401, detail="Credenciales incorrectas")
+    
+    
+SECRET_KEY = "mi_clave_secreta"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+def crear_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def verificar_token(token: str):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload["user_id"]
+    except:
+        raise HTTPException(status_code=401, detail="Token inválido")
+    
