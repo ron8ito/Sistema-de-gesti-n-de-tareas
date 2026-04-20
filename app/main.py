@@ -235,7 +235,9 @@ def crear_token(data: dict):
 def verificar_token(token: str):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        print("PAYLOAD:", payload)
         return payload["user_id"]
-    except:
+    except Exception as e:
+        print("ERROR TOKEN:", e)  # 👈 CLAVE
         raise HTTPException(status_code=401, detail="Token inválido")
     
