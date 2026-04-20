@@ -1,46 +1,58 @@
 import { useEffect, useState } from "react";
-import { getTareas, crearTarea } from "../services/api";
+import { getTareas, crearTarea, completarTarea } from "../services/api";
 
 function Tareas() {
   const [tareas, setTareas] = useState([]);
   const [titulo, setTitulo] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [fecha, setFecha] = useState("");
-  const [estado, setEstado] = useState("pendiente");
 
   useEffect(() => {
-    const cargarTareas = async () => {
-      const data = await getTareas();
-      setTareas(data);
-    };
-
     cargarTareas();
   }, []);
 
- const handleCrear = async () => {
-  console.log("CLICK CREAR");
+  const cargarTareas = async () => {
+    try {
+      const data = await getTareas();
+      setTareas(data);
+    } catch (error) {
+      console.error("ERROR CARGANDO:", error);
+    }
+  };
 
-  try {
-    const res = await crearTarea({
+  const handleCrear = async () => {
+    try {
+      console.log({
       titulo,
       descripcion,
-      fecha_vencimiento: "fecha",
-      estado: "pendiente",
-    });
+      fecha,
+  });
+      await crearTarea({
+        titulo,
+        descripcion,
+        fecha_vencimiento: fecha,
+        estado: "pendiente",
+      });
 
-    console.log("RESPUESTA:", res);
+      setTitulo("");
+      setDescripcion("");
+      setFecha("");
 
-    setTitulo("");
-    setDescripcion("");
+      await cargarTareas();
+    } catch (error) {
+      console.error("ERROR CREAR:", error);
+    }
+  };
 
-    const data = await getTareas();
-    setTareas(data);
+  const handleCompletar = async (id) => {
+    try {
+      await completarTarea(id);
+      await cargarTareas();
+    } catch (error) {
+      console.error("ERROR COMPLETAR:", error);
+    }
+  };
 
-  } catch (error) {
-    console.error("ERROR CREANDO:", error);
-    alert("Error al crear tarea");
-  }
-};
   return (
     <div>
       <h2>Mis tareas</h2>
@@ -59,29 +71,41 @@ function Tareas() {
         onChange={(e) => setDescripcion(e.target.value)}
       />
 
-      <input 
+      <input
         type="date"
-          value={fecha}
-          onChange={(e) => setFecha(e.target.value)}
+        value={fecha}
+        onChange={(e) => setFecha(e.target.value)}
       />
-
-      <select value={estado} onChange={(e) => setEstado(e.target.value)}>
-          <option value="pendiente">Pendiente</option>
-       </select>
 
       <button onClick={handleCrear}>Crear</button>
 
+      <hr />
 
-      {tareas.map((t) => (
-        <div key={t.id}>
-          <h4>{t.titulo}</h4>
-          <p>{t.descripcion}</p>
-          <p>{t.fecha_vencimiento}</p>
-          <p>{t.estado}</p>
-        </div>
-      ))}
+      {tareas.length === 0 ? (
+        <p>No hay tareas</p>
+      ) : (
+        tareas.map((t) => (
+          <div
+            key={t.id}
+            style={{
+              border: "1px solid white",
+              margin: "10px",
+              padding: "10px",
+            }}
+          >
+            <h3>{t.titulo}</h3>
+            <p>{t.descripcion}</p>
+            <p>Fecha: {t.fecha_vencimiento}</p>
+            <p>Estado: {t.estado}</p>
+
+            <button onClick={() => handleCompletar(t.id)}>
+              ✔️ Completar
+            </button>
+          </div>
+        ))
+      )}
     </div>
   );
 }
 
-export default Tareas;
+export default Tareas;  

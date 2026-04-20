@@ -4,7 +4,7 @@ from sqlalchemy import text
 from jose import jwt
 from datetime import datetime, timedelta
 from app.database.connection import SessionLocal
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import FastAPI, Query, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -20,9 +20,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from pydantic import BaseModel
+
 class Tarea(BaseModel):
-    titulo: str = Field(..., min_length=1)
-    descripcion: str = Field(..., min_length=1)
+    titulo: str
+    descripcion: str
     fecha_vencimiento: str
     estado: str
      
@@ -33,76 +35,91 @@ def inicio():
 
 # 🔹 GET
 @app.get("/tareas")
-def obtener_tareas(token: str = Query(None)):
-
-    if not token:
-        raise HTTPException(status_code=401, detail="No autorizado")
+def obtener_tareas(token: str = Query(...)):
 
     usuario_id = verificar_token(token)
-
     db = SessionLocal()
 
-    try:
-        result = db.execute(
-            text("SELECT * FROM tareas WHERE usuario_id = :usuario_id"),
-            {"usuario_id": usuario_id}
-        ).fetchall()
-
-    except Exception:
-        raise HTTPException(status_code=500, detail="Error al obtener datos")
-
-    finally:
-        db.close()
+    query = "SELECT * FROM tareas WHERE usuario_id = :usuario_id"
+    result = db.execute(text(query), {"usuario_id": usuario_id}).fetchall()
 
     tareas = []
     for row in result:
         tareas.append({
             "id": row[0],
             "titulo": row[1],
-            "descripcion": row[2],
-            "fecha_vencimiento": row[3],
-            "estado": row[4],
-            "usuario_id": row[5]
+            "usuario_id": row[2],
+            "descripcion": row[3],
+            "fecha_vencimiento": row[4],
+            "estado": row[5]
         })
 
+    db.close()
     return tareas
-
 
 # 🔹 POST
 @app.post("/tareas")
-def crear_tarea(tarea: Tarea, token: str = Query(None)):
-
-    if not token:
-        raise HTTPException(status_code=401, detail="No autorizado")
+def crear_tarea(tarea: Tarea, token: str = Query(...)):
 
     usuario_id = verificar_token(token)
-
     db = SessionLocal()
 
     try:
         query = """
-        INSERT INTO tareas (titulo, descripcion, fecha_vencimiento, estado, usuario_id)
-        VALUES (:titulo, :descripcion, :fecha_vencimiento, :estado, :usuario_id)
+        INSERT INTO tareas (titulo, usuario_id, descripcion, fecha_vencimiento, estado)
+        VALUES (:titulo, :usuario_id, :descripcion, :fecha_vencimiento, :estado)
         """
 
         db.execute(text(query), {
             "titulo": tarea.titulo,
+            "usuario_id": usuario_id,
             "descripcion": tarea.descripcion,
             "fecha_vencimiento": tarea.fecha_vencimiento,
-            "estado": tarea.estado,
-            "usuario_id": usuario_id
+            "estado": tarea.estado
         })
 
         db.commit()
 
-    except Exception as e:
-        db.rollback()  # MUY IMPORTANTE
+    except Exception:
+        db.rollback()
         raise HTTPException(status_code=500, detail="Error en base de datos")
 
     finally:
         db.close()
 
+    
+    print("TAREA RECIBIDA:", tarea)
+
     return {"mensaje": "Tarea creada"}
+
+@app.post("/tareas/{tarea_id}/completar")
+def completar_tarea(tarea_id: int, token: str = Query(...)):
+
+    usuario_id = verificar_token(token)
+    db = SessionLocal()
+
+    try:
+        query = """
+        UPDATE tareas
+        SET estado = 'completada'
+        WHERE id = :id AND usuario_id = :usuario_id
+        """
+
+        db.execute(text(query), {
+            "id": tarea_id,
+            "usuario_id": usuario_id
+        })
+
+        db.commit()
+
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Error al completar tarea")
+
+    finally:
+        db.close()
+
+    return {"mensaje": "Tarea completada"}
 
 # 🔹 PUT (actualizar)
 @app.put("/tareas/{id}")
@@ -241,3 +258,38 @@ def verificar_token(token: str):
         print("ERROR TOKEN:", e)  # 👈 CLAVE
         raise HTTPException(status_code=401, detail="Token inválido")
     
+
+@app.post("/tareas")
+def crear_tarea(tarea: Tarea, token: str = Query(...)):
+
+    usuario_id = verificar_token(token)
+    db = SessionLocal()
+
+    try:
+        query = """
+        INSERT INTO tareas (titulo, usuario_id, descripcion, fecha_vencimiento, estado)
+        VALUES (:titulo, :usuario_id, :descripcion, :fecha_vencimiento, :estado)
+        """
+
+        datos = {
+            "titulo": tarea.titulo,
+            "usuario_id": usuario_id,
+            "descripcion": tarea.descripcion,
+            "fecha_vencimiento": tarea.fecha_vencimiento,
+            "estado": tarea.estado
+        }
+
+        print("INSERTANDO:", datos)  # 👈 para verificar
+
+        db.execute(text(query), datos)
+        db.commit()
+
+    except Exception as e:
+        db.rollback()
+        print("ERROR:", e)
+        raise HTTPException(status_code=500, detail="Error en base de datos")
+
+    finally:
+        db.close()
+
+    return {"mensaje": "Tarea creada"}

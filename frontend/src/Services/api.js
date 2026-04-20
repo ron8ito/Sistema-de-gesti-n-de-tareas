@@ -27,22 +27,14 @@ export const getTareas = async () => {
   const token = localStorage.getItem("token");
 
   const response = await fetch(
-    `${API_URL}/tareas?token=${encodeURIComponent(token)}`
+    `${API_URL}/tareas?token=${token}`
   );
-
-  if (response.status === 401) {
-    localStorage.removeItem("token");
-    window.location.href = "/";
-    return;
-  }
-
-  const data = await response.json();
 
   if (!response.ok) {
     throw new Error("Error al obtener tareas");
   }
 
-  return data;
+  return await response.json();
 };
 
 // 🔹 CREAR TAREA
@@ -50,7 +42,7 @@ export const crearTarea = async (tarea) => {
   const token = localStorage.getItem("token");
 
   const response = await fetch(
-    `${API_URL}/tareas?token=${encodeURIComponent(token)}`,
+    `${API_URL}/tareas?token=${token}`,
     {
       method: "POST",
       headers: {
@@ -60,17 +52,27 @@ export const crearTarea = async (tarea) => {
     }
   );
 
-  if (response.status === 401) {
-    localStorage.removeItem("token");
-    window.location.href = "/";
-    return;
-  }
-
-  const data = await response.json();
-
   if (!response.ok) {
     throw new Error("Error al crear tarea");
   }
 
-  return data;
+  return await response.json();
+};
+
+// 🔹 COMPLETAR TAREA
+export const completarTarea = async (id) => {
+  const token = localStorage.getItem("token");
+
+  const response = await fetch(
+    `http://127.0.0.1:8000/tareas/${id}/completar?token=${token}`,
+    {
+      method: "POST",
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("Error al completar tarea");
+  }
+
+  return await response.json();
 };
