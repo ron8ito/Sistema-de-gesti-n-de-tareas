@@ -1,13 +1,24 @@
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field 
 from sqlalchemy import text
 from jose import jwt
 from datetime import datetime, timedelta
 from app.database.connection import SessionLocal
 from fastapi import FastAPI, Query, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+
 
 app = FastAPI()
 
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class Tarea(BaseModel):
     titulo: str = Field(..., min_length=1)
@@ -167,12 +178,6 @@ def eliminar_tarea(id: int, token: str = Query(None)):
         db.close()
 
     return {"mensaje": "Tarea eliminada"}
-
-engine #Codigo para probar la coneccion
-
-@app.get("/test-db")
-def test_db():
-    return {"mensaje": "Conexión exitosa"}
 
 
 class Usuario(BaseModel):
