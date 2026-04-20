@@ -1,19 +1,19 @@
-from fastapi import FastAPI, Query, Header, HTTPException
+
 from pydantic import BaseModel
 from sqlalchemy import text
 from jose import jwt
 from datetime import datetime, timedelta
 from app.database.connection import SessionLocal
+from fastapi import FastAPI, Query, HTTPException
 
 app = FastAPI()
 
 
 class Tarea(BaseModel):
-     titulo: str
-     usuario_id: int
-     descripcion: str
-     fecha_vencimiento: str
-     estado: str
+    titulo: str = Field(..., min_length=1)
+    descripcion: str = Field(..., min_length=1)
+    fecha_vencimiento: str
+    estado: str
      
 
 @app.get("/")
@@ -22,36 +22,42 @@ def inicio():
 
 # 🔹 GET
 @app.get("/tareas")
-def obtener_tareas(usuario_id: int = Query(None)):
+def obtener_tareas(token: str = Query(None)):
+
+    if not token:
+        raise HTTPException(status_code=401, detail="No autorizado")
+
+    usuario_id = verificar_token(token)
+
     db = SessionLocal()
 
-    if usuario_id:
-        query = "SELECT * FROM tareas WHERE usuario_id = :usuario_id"
-        result = db.execute(text(query), {"usuario_id": usuario_id}).fetchall()
-    else:
-        result = db.execute(text("SELECT * FROM tareas")).fetchall()
+    try:
+        result = db.execute(
+            text("SELECT * FROM tareas WHERE usuario_id = :usuario_id"),
+            {"usuario_id": usuario_id}
+        ).fetchall()
+
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al obtener datos")
+
+    finally:
+        db.close()
 
     tareas = []
     for row in result:
         tareas.append({
             "id": row[0],
             "titulo": row[1],
-            "usuario_id": row[2],
-            "descripcion": row[3],
-            "fecha_vencimiento": row[4],
-            "estado": row[5],
+            "descripcion": row[2],
+            "fecha_vencimiento": row[3],
+            "estado": row[4],
+            "usuario_id": row[5]
         })
-
-    db.close()
 
     return tareas
 
+
 # 🔹 POST
-
-from fastapi import Header, HTTPException
-
-from fastapi import Query
-
 @app.post("/tareas")
 def crear_tarea(tarea: Tarea, token: str = Query(None)):
 
@@ -62,53 +68,107 @@ def crear_tarea(tarea: Tarea, token: str = Query(None)):
 
     db = SessionLocal()
 
-    query = """
-    INSERT INTO tareas (titulo, descripcion, fecha_vencimiento, estado, usuario_id)
-    VALUES (:titulo, :descripcion, :fecha_vencimiento, :estado, :usuario_id)
-    """
+    try:
+        query = """
+        INSERT INTO tareas (titulo, descripcion, fecha_vencimiento, estado, usuario_id)
+        VALUES (:titulo, :descripcion, :fecha_vencimiento, :estado, :usuario_id)
+        """
 
-    db.execute(text(query), {
-        "titulo": tarea.titulo,
-        "descripcion": tarea.descripcion,
-        "fecha_vencimiento": tarea.fecha_vencimiento,
-        "estado": tarea.estado,
-        "usuario_id": usuario_id
-    })
+        db.execute(text(query), {
+            "titulo": tarea.titulo,
+            "descripcion": tarea.descripcion,
+            "fecha_vencimiento": tarea.fecha_vencimiento,
+            "estado": tarea.estado,
+            "usuario_id": usuario_id
+        })
 
-    db.commit()
-    db.close()
+        db.commit()
+
+    except Exception as e:
+        db.rollback()  # MUY IMPORTANTE
+        raise HTTPException(status_code=500, detail="Error en base de datos")
+
+    finally:
+        db.close()
 
     return {"mensaje": "Tarea creada"}
+
 # 🔹 PUT (actualizar)
 @app.put("/tareas/{id}")
-def actualizar_tarea(id: int, tarea: Tarea):
+def actualizar_tarea(id: int, tarea: Tarea, token: str = Query(None)):
+
+    if not token:
+        raise HTTPException(status_code=401, detail="No autorizado")
+
+    usuario_id = verificar_token(token)
+
     db = SessionLocal()
 
-    query = "UPDATE tareas SET titulo = :titulo WHERE id = :id"
-    db.execute(text(query), {
-        "titulo": tarea.titulo,
-        "id": id
-    })
+    try:
+        query = """
+        UPDATE tareas 
+        SET titulo = :titulo, descripcion = :descripcion, 
+            fecha_vencimiento = :fecha_vencimiento, estado = :estado
+        WHERE id = :id AND usuario_id = :usuario_id
+        """
 
-    db.commit()
-    db.close()
+        result = db.execute(text(query), {
+            "id": id,
+            "titulo": tarea.titulo,
+            "descripcion": tarea.descripcion,
+            "fecha_vencimiento": tarea.fecha_vencimiento,
+            "estado": tarea.estado,
+            "usuario_id": usuario_id
+        })
+
+        db.commit()
+
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Tarea no encontrada")
+
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Error en base de datos")
+
+    finally:
+        db.close()
 
     return {"mensaje": "Tarea actualizada"}
 
 # 🔹 DELETE (eliminar)
 @app.delete("/tareas/{id}")
-def eliminar_tarea(id: int):
+def eliminar_tarea(id: int, token: str = Query(None)):
+
+    if not token:
+        raise HTTPException(status_code=401, detail="No autorizado")
+
+    usuario_id = verificar_token(token)
+
     db = SessionLocal()
 
-    query = "DELETE FROM tareas WHERE id = :id"
-    db.execute(text(query), {"id": id})
+    try:
+        query = "DELETE FROM tareas WHERE id = :id AND usuario_id = :usuario_id"
 
-    db.commit()
-    db.close()
+        result = db.execute(text(query), {
+            "id": id,
+            "usuario_id": usuario_id
+        })
+
+        db.commit()
+
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Tarea no encontrada")
+
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Error en base de datos")
+
+    finally:
+        db.close()
 
     return {"mensaje": "Tarea eliminada"}
 
-from app.database.connection import engine #Codigo para probar la coneccion
+engine #Codigo para probar la coneccion
 
 @app.get("/test-db")
 def test_db():
