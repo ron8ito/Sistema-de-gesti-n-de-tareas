@@ -2,6 +2,7 @@ import { useState } from "react";
 import Login from "./pages/Login";
 import Registro from "./pages/Registro";
 import Tareas from "./pages/Tareas";
+import "./App.css";
 
 function App() {
   const [vista, setVista] = useState("login");

@@ -124,7 +124,24 @@ function Tareas() {
   };
 
   return (
-    <div>
+  <>
+    {/* HEADER */}
+    <div className="header">
+      <h1>Gestor de Tareas</h1>
+
+      <button
+        className="logout-btn"
+        onClick={() => {
+          localStorage.removeItem("token");
+          window.location.reload();
+        }}
+      >
+        Cerrar sesión
+      </button>
+    </div>
+
+    {/* CONTENIDO */}
+    <div className="container">
       <h2>Mis tareas</h2>
 
       <input
@@ -162,35 +179,38 @@ function Tareas() {
         <p>No hay tareas</p>
       ) : (
         tareas.map((t) => (
-          <div
-            key={t.id}
-            style={{
-              border: "1px solid white",
-              margin: "10px",
-              padding: "10px",
-            }}
-          >
+          <div key={t.id} className="card">
             <h3>{t.titulo}</h3>
             <p>{t.descripcion}</p>
-            <p>Fecha: {t.fecha_vencimiento}</p>
-            <p>Estado: {t.estado}</p>
+            <p><strong>Fecha:</strong> {t.fecha_vencimiento}</p>
+            <p><strong>Estado:</strong> {t.estado}</p>
 
-            <button onClick={() => handleCompletar(t.id)}>
+            <button
+              className="btn-completar"
+              onClick={() => handleCompletar(t.id)}
+            >
               ✔️ Completar
             </button>
 
-            <button onClick={() => handleEditar(t)}>
+            <button
+              className="btn-editar"
+              onClick={() => handleEditar(t)}
+            >
               ✏️ Editar
             </button>
 
-            <button onClick={() => eliminarTarea(t.id)}>
+            <button
+              className="btn-eliminar"
+              onClick={() => eliminarTarea(t.id)}
+            >
               🗑️ Eliminar
             </button>
           </div>
         ))
       )}
     </div>
-  );
-}
+  </>
+);
+} 
 
 export default Tareas;
