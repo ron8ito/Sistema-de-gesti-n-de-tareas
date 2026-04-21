@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { loginUser } from "../services/api";
 
-function Login() {
+function Login({cambiarVista}) {
   console.log("Login cargado");
 
   const [username, setUsername] = useState("");
@@ -14,8 +14,8 @@ function Login() {
       const data = await loginUser(username, password);
       console.log("Respuesta:", data);
       localStorage.setItem("token", data.access_token);
+      cambiarVista("tareas");
       alert("Login exitoso");
-      window.location.href = "/tareas";
     } catch (error) {
       console.error(error);
       alert("Error en login");
@@ -41,6 +41,9 @@ function Login() {
       />
 
       <button onClick={handleLogin}>Ingresar</button>
+      <button onClick={() => cambiarVista("registro")}>
+      Ir a registro
+      </button>
     </div>
   );
 }

@@ -101,3 +101,19 @@ export const actualizarTarea = async (id, datos) => {
 
   return await response.json();
 };
+
+export const registrarUsuario = async (datos) => {
+  const response = await fetch(`${API_URL}/registro`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(datos),
+  });
+
+  if (!response.ok) {
+    throw new Error("Error al registrar usuario");
+  }
+
+  return await response.json();
+};
