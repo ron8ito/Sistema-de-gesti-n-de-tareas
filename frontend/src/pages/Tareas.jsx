@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { getTareas, crearTarea, completarTarea } from "../services/api";
+import { getTareas, crearTarea, completarTarea, actualizarTarea } from "../services/api";
 
 function Tareas() {
   const [tareas, setTareas] = useState([]);
   const [titulo, setTitulo] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [fecha, setFecha] = useState("");
+  const [editandoId, setEditandoId] = useState(null);
 
   useEffect(() => {
     cargarTareas();
@@ -20,15 +21,9 @@ function Tareas() {
     }
   };
 
+  // 🟢 CREAR
   const handleCrear = async () => {
     try {
-      console.log("Creando tarea...");
-      
-      console.log({
-      titulo,
-      descripcion,
-      fecha,
-  });
       await crearTarea({
         titulo,
         descripcion,
@@ -46,12 +41,85 @@ function Tareas() {
     }
   };
 
+  // 🟡 EDITAR (cargar datos en inputs)
+  const handleEditar = (t) => {
+    setEditandoId(t.id);
+    setTitulo(t.titulo);
+    setDescripcion(t.descripcion);
+    setFecha(t.fecha_vencimiento);
+  };
+
+  // 🔵 ACTUALIZAR (PUT)
+  const handleActualizar = async () => {
+  try {
+    const datos = {};
+
+    if (titulo && titulo.trim() !== "") {
+      datos.titulo = titulo;
+    }
+
+    if (descripcion && descripcion.trim() !== "") {
+      datos.descripcion = descripcion;
+    }
+
+    if (fecha && fecha !== "") {
+    datos.fecha_vencimiento = fecha + "T00:00:00";
+    }
+
+    await actualizarTarea(editandoId, datos);
+
+    setEditandoId(null);
+    setTitulo("");
+    setDescripcion("");
+    setFecha("");
+
+    await cargarTareas();
+  } catch (error) {
+    console.error("ERROR ACTUALIZAR:", error);
+  }
+};
+
+  // 🟣 COMPLETAR
   const handleCompletar = async (id) => {
     try {
       await completarTarea(id);
       await cargarTareas();
     } catch (error) {
       console.error("ERROR COMPLETAR:", error);
+    }
+  };
+
+  // 🔴 ELIMINAR
+  const eliminarTarea = async (id) => {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      alert("No estás autenticado");
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        `http://127.0.0.1:8000/tareas/${id}?token=${token}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (res.status === 401) {
+        localStorage.removeItem("token");
+        window.location.href = "/";
+        return;
+      }
+
+      if (!res.ok) {
+        console.error("Error al eliminar");
+        return;
+      }
+
+      await cargarTareas();
+    } catch (error) {
+      console.error("ERROR ELIMINAR:", error);
     }
   };
 
@@ -79,7 +147,14 @@ function Tareas() {
         onChange={(e) => setFecha(e.target.value)}
       />
 
+      {/* BOTONES */}
       <button onClick={handleCrear}>Crear</button>
+
+      {editandoId && (
+        <button onClick={handleActualizar}>
+          Actualizar
+        </button>
+      )}
 
       <hr />
 
@@ -103,6 +178,14 @@ function Tareas() {
             <button onClick={() => handleCompletar(t.id)}>
               ✔️ Completar
             </button>
+
+            <button onClick={() => handleEditar(t)}>
+              ✏️ Editar
+            </button>
+
+            <button onClick={() => eliminarTarea(t.id)}>
+              🗑️ Eliminar
+            </button>
           </div>
         ))
       )}
@@ -110,4 +193,4 @@ function Tareas() {
   );
 }
 
-export default Tareas;  
+export default Tareas;

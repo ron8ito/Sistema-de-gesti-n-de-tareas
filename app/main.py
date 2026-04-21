@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from app.database.connection import SessionLocal
 from fastapi import FastAPI, Query, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from typing import Optional
 
 
 app = FastAPI()
@@ -28,6 +29,11 @@ class Tarea(BaseModel):
     fecha_vencimiento: str
     estado: str
      
+class TareaUpdate(BaseModel):
+    titulo: Optional[str] = None
+    descripcion: Optional[str] = None
+    fecha_vencimiento: Optional[datetime] = None
+    estado: Optional[str] = None
 
 @app.get("/")
 def inicio():
@@ -59,9 +65,13 @@ def obtener_tareas(token: str = Query(...)):
 
 # 🔹 POST
 @app.post("/tareas")
-def crear_tarea(tarea: Tarea, token: str = Query(...)):
+def crear_tarea(tarea: Tarea, token: str = Query(None)):
+
+    if not token:
+        raise HTTPException(status_code=401, detail="No autorizado")
 
     usuario_id = verificar_token(token)
+
     db = SessionLocal()
 
     try:
@@ -86,9 +96,6 @@ def crear_tarea(tarea: Tarea, token: str = Query(...)):
 
     finally:
         db.close()
-
-    
-    print("TAREA RECIBIDA:", tarea)
 
     return {"mensaje": "Tarea creada"}
 
@@ -123,7 +130,7 @@ def completar_tarea(tarea_id: int, token: str = Query(...)):
 
 # 🔹 PUT (actualizar)
 @app.put("/tareas/{id}")
-def actualizar_tarea(id: int, tarea: Tarea, token: str = Query(None)):
+def actualizar_tarea(id: int, tarea: TareaUpdate, token: str = Query(None)):
 
     if not token:
         raise HTTPException(status_code=401, detail="No autorizado")
@@ -133,21 +140,36 @@ def actualizar_tarea(id: int, tarea: Tarea, token: str = Query(None)):
     db = SessionLocal()
 
     try:
-        query = """
+        #QUERY
+        campos = []
+        valores = {"id": id, "usuario_id": usuario_id}
+
+        if tarea.titulo is not None:
+            campos.append("titulo = :titulo")
+            valores["titulo"] = tarea.titulo
+
+        if tarea.descripcion is not None:
+            campos.append("descripcion = :descripcion")
+            valores["descripcion"] = tarea.descripcion
+
+        if tarea.fecha_vencimiento is not None:
+            campos.append("fecha_vencimiento = :fecha_vencimiento")
+            valores["fecha_vencimiento"] = tarea.fecha_vencimiento
+
+        if tarea.estado is not None:
+            campos.append("estado = :estado")
+            valores["estado"] = tarea.estado
+
+        if not campos:
+            raise HTTPException(status_code=400, detail="No hay datos para actualizar")
+
+        query = f"""
         UPDATE tareas 
-        SET titulo = :titulo, descripcion = :descripcion, 
-            fecha_vencimiento = :fecha_vencimiento, estado = :estado
+        SET {", ".join(campos)}
         WHERE id = :id AND usuario_id = :usuario_id
         """
 
-        result = db.execute(text(query), {
-            "id": id,
-            "titulo": tarea.titulo,
-            "descripcion": tarea.descripcion,
-            "fecha_vencimiento": tarea.fecha_vencimiento,
-            "estado": tarea.estado,
-            "usuario_id": usuario_id
-        })
+        result = db.execute(text(query), valores)
 
         db.commit()
 

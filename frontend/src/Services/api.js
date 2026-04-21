@@ -52,10 +52,11 @@ export const crearTarea = async (tarea) => {
     }
   );
 
-  if (!response.ok) {
-    throw new Error("Error al crear tarea");
-  }
-
+  if (response.status === 401) {
+  localStorage.removeItem("token");
+  window.location.href = "/";
+  return;
+}
   return await response.json();
 };
 
@@ -72,6 +73,30 @@ export const completarTarea = async (id) => {
 
   if (!response.ok) {
     throw new Error("Error al completar tarea");
+  }
+
+  return await response.json();
+};
+
+export const actualizarTarea = async (id, datos) => {
+  const token = localStorage.getItem("token");
+
+  const response = await fetch(`${API_URL}/tareas/${id}?token=${token}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(datos),
+  });
+
+  if (response.status === 401) {
+    localStorage.removeItem("token");
+    window.location.href = "/";
+    return;
+  }
+
+  if (!response.ok) {
+    throw new Error("Error al actualizar tarea");
   }
 
   return await response.json();
