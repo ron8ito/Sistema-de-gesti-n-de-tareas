@@ -22,6 +22,8 @@ function Tareas() {
 
   const handleCrear = async () => {
     try {
+      console.log("Creando tarea...");
+      
       console.log({
       titulo,
       descripcion,
