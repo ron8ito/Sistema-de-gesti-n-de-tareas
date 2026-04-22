@@ -5,7 +5,7 @@
     completarTarea,
     eliminarTarea,
     actualizarTarea
-  } from "../services/api";
+  } from "../Services/api";
 
   function Tareas() {
     const [tareas, setTareas] = useState([]);
