@@ -117,3 +117,25 @@ export const registrarUsuario = async (datos) => {
 
   return await response.json();
 };
+
+export const eliminarTarea = async (id) => {
+  const token = localStorage.getItem("token");
+
+  const response = await fetch(
+    `http://127.0.0.1:8000/tareas/${id}?token=${token}`,
+    {
+      method: "DELETE",
+    }
+  );
+
+  if (response.status === 404) {
+    console.log("Tarea ya eliminada o no existe");
+    return;
+  }
+
+  if (!response.ok) {
+    throw new Error("Error al eliminar tarea");
+  }
+
+  return await response.json();
+};

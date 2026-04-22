@@ -35,6 +35,7 @@ class TareaUpdate(BaseModel):
     fecha_vencimiento: Optional[datetime] = None
     estado: Optional[str] = None
 
+
 @app.get("/")
 def inicio():
     return {"mensaje": "Hola mundo"}
@@ -209,8 +210,13 @@ def eliminar_tarea(id: int, token: str = Query(None)):
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Tarea no encontrada")
 
-    except Exception:
+    # 👇 ESTE ES EL CAMBIO IMPORTANTE
+    except HTTPException:
+        raise  # deja pasar errores como 404 o 401
+
+    except Exception as e:
         db.rollback()
+        print("ERROR REAL:", e)
         raise HTTPException(status_code=500, detail="Error en base de datos")
 
     finally:
