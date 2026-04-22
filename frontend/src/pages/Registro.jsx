@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { registrarUsuario } from "../services/api";
+import { registrarUsuario } from "../Services/api";
 
 function Register({ cambiarVista }) {
   const [username, setUsername] = useState("");
