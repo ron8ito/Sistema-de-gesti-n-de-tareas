@@ -4,7 +4,7 @@
     crearTarea,
     completarTarea,
     eliminarTarea,
-    actualizarTarea,
+    actualizarTarea
   } from "../services/api";
 
   function Tareas() {
