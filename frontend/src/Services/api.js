@@ -1,5 +1,4 @@
-const API_URL = "http://127.0.0.1:8000";
-
+const API_URL = "https://gestor-backend-417u.onrender.com";
 // 🔹 LOGIN
 export const loginUser = async (username, password) => {
   const response = await fetch(`${API_URL}/login`, {
