@@ -1,4 +1,4 @@
-const API_URL = "https://gestor-backend-417u.onrender.com";
+const API_URL = "https://sistema-de-gesti-n-de-tareas-bgsu.onrender.com";
 // 🔹 LOGIN
 export const loginUser = async (username, password) => {
   const response = await fetch(`${API_URL}/login`, {
@@ -64,7 +64,7 @@ export const completarTarea = async (id) => {
   const token = localStorage.getItem("token");
 
   const response = await fetch(
-    `http://127.0.0.1:8000/tareas/${id}/completar?token=${token}`,
+    `${API_URL}/tareas/${id}/completar?token=${token}`,
     {
       method: "POST",
     }
@@ -121,7 +121,7 @@ export const eliminarTarea = async (id) => {
   const token = localStorage.getItem("token");
 
   const response = await fetch(
-    `http://127.0.0.1:8000/tareas/${id}?token=${token}`,
+    `${API_URL}/tareas/${id}?token=${token}`,
     {
       method: "DELETE",
     }
