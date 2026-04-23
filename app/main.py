@@ -6,8 +6,8 @@ from jose import jwt
 from datetime import datetime, timedelta
 from app.database.connection import SessionLocal, engine, Base  # 👈 IMPORTANTE
 from typing import Optional
-from app.models import user, task
-
+import app.models.user
+import app.models.task
 app = FastAPI()
 
 # 🔥 CREAR TABLAS
