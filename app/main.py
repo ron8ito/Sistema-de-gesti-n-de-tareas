@@ -1,18 +1,33 @@
 from fastapi import FastAPI, Query, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field 
+from pydantic import BaseModel, Field
 from sqlalchemy import text
 from jose import jwt
 from datetime import datetime, timedelta
-from app.database.connection import SessionLocal, engine, Base  # 👈 IMPORTANTE
+from app.database.connection import SessionLocal, engine, Base
 from typing import Optional
+
+# 🔥 IMPORTAR MODELOS (ANTES DE CREAR LA APP)
 import app.models.user
 import app.models.task
+
+# 🔥 CREAR APP
 app = FastAPI()
 
-# 🔥 CREAR TABLAS
-Base.metadata.create_all(bind=engine)
+# 🔥 CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
+# 🔥 CREAR TABLAS AL INICIAR
+@app.on_event("startup")
+def startup():
+    Base.metadata.create_all(bind=engine)
+    
 # 🔥 CORS
 app.add_middleware(
     CORSMiddleware,
