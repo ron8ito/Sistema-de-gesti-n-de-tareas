@@ -4,12 +4,16 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from jose import jwt
 from datetime import datetime, timedelta
-from app.database.connection import SessionLocal
+from app.database.connection import SessionLocal, engine, Base  # 👈 IMPORTANTE
 from typing import Optional
+from app.models import user, task
 
 app = FastAPI()
 
-# 🔥 CORS (ESTO ES CLAVE)
+# 🔥 CREAR TABLAS
+Base.metadata.create_all(bind=engine)
+
+# 🔥 CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
