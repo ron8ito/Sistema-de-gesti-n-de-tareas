@@ -1,22 +1,19 @@
-
+from fastapi import FastAPI, Query, Header, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field 
 from sqlalchemy import text
 from jose import jwt
 from datetime import datetime, timedelta
 from app.database.connection import SessionLocal
-from fastapi import FastAPI, Query, Header, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
-
 
 app = FastAPI()
 
-from fastapi.middleware.cors import CORSMiddleware
-
+# 🔥 CORS (ESTO ES CLAVE)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
