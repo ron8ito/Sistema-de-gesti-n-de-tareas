@@ -28,27 +28,6 @@ app.add_middleware(
 def startup():  
     Base.metadata.create_all(bind=engine)
 
-from passlib.context import CryptContext
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-def hash_password(password: str):
-    return pwd_context.hash(password)
-
-def verify_password(plain_password: str, hashed_password: str):
-    return pwd_context.verify(plain_password, hashed_password)
-
-# 🔥 CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-from pydantic import BaseModel
-
 class Tarea(BaseModel):
     titulo: str
     descripcion: str
@@ -257,6 +236,16 @@ class Usuario(BaseModel):
 
 import re
 
+from passlib.context import CryptContext
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def hash_password(password: str):
+    return pwd_context.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str):
+    return pwd_context.verify(plain_password, hashed_password)
+
 def validar_password(password: str):
     if len(password) < 8:
         raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres")
@@ -266,25 +255,36 @@ def validar_password(password: str):
 
     if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
         raise HTTPException(status_code=400, detail="Debe contener al menos un carácter especial")
+    
 
 @app.post("/registro")
 def registrar(usuario: Usuario):
-    # 🔐 Validar contraseña (nuevo)
+    print("🔥 NUEVA VERSION ACTIVA 🔥")  # 👈 para verificar deploy
+
+    # 🔐 Validar contraseña
     validar_password(usuario.password)
 
-    # 🔐 Hashear contraseña (nuevo)
+    # 🔐 Hashear contraseña
     hashed_password = hash_password(usuario.password)
 
     db = SessionLocal()
 
-    query = "INSERT INTO usuarios (username, password) VALUES (:username, :password)"
-    db.execute(text(query), {
-        "username": usuario.username,
-        "password": hashed_password  # 👈 antes era texto plano
-    })
+    try:
+        query = "INSERT INTO usuarios (username, password) VALUES (:username, :password)"
+        db.execute(text(query), {
+            "username": usuario.username,
+            "password": hashed_password
+        })
 
-    db.commit()
-    db.close()
+        db.commit()
+
+    except Exception as e:
+        db.rollback()
+        print("ERROR REGISTRO:", e)
+        raise HTTPException(status_code=500, detail="Error al crear usuario")
+
+    finally:
+        db.close()
 
     return {"mensaje": "Usuario creado"}
 
@@ -337,7 +337,6 @@ def login(usuario: Usuario):
         "access_token": token
     }
     
-    
 SECRET_KEY = "mi_clave_secreta"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
@@ -357,14 +356,3 @@ def verificar_token(token: str):
         print("ERROR TOKEN:", e)  # 👈 CLAVE
         raise HTTPException(status_code=401, detail="Token inválido")
     
-import re
-
-def validar_password(password: str):
-    if len(password) < 8:
-        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres")
-
-    if not re.search(r"[A-Za-z]", password):
-        raise HTTPException(status_code=400, detail="Debe contener al menos una letra")
-
-    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
-        raise HTTPException(status_code=400, detail="Debe contener al menos un carácter especial")
