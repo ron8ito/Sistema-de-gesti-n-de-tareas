@@ -89,6 +89,8 @@ function Login({ cambiarVista }) {
               console.log("Error con Google");
               alert("Error con Google");
             }}
+            useOneTap={false}
+            prompt="select_account"
           />
         </div>
 
