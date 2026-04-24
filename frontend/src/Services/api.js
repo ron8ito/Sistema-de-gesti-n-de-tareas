@@ -1,5 +1,29 @@
-const API_URL ="https://sistema-de-gesti-n-de-tareas-bgsu.onrender.com";
-// 🔹 LOGIN
+const API_URL = "https://sistema-de-gesti-n-de-tareas-bgsu.onrender.com";
+
+// 🔥 FETCH CENTRALIZADO
+const apiFetch = async (url, options = {}) => {
+  const token = localStorage.getItem("token");
+
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+      Authorization: token ? `Bearer ${token}` : "",
+    },
+  });
+
+  // 🔐 sesión expirada
+  if (response.status === 401) {
+    localStorage.removeItem("token");
+    window.location.href = "/";
+    return;
+  }
+
+  return response;
+};
+
+// 🔹 LOGIN (no usa token)
 export const loginUser = async (username, password) => {
   const response = await fetch(`${API_URL}/login`, {
     method: "POST",
@@ -23,11 +47,7 @@ export const loginUser = async (username, password) => {
 
 // 🔹 GET TAREAS
 export const getTareas = async () => {
-  const token = localStorage.getItem("token");
-
-  const response = await fetch(
-    `${API_URL}/tareas?token=${token}`
-  );
+  const response = await apiFetch(`${API_URL}/tareas`);
 
   if (!response.ok) {
     throw new Error("Error al obtener tareas");
@@ -38,37 +58,19 @@ export const getTareas = async () => {
 
 // 🔹 CREAR TAREA
 export const crearTarea = async (tarea) => {
-  const token = localStorage.getItem("token");
+  const response = await apiFetch(`${API_URL}/tareas`, {
+    method: "POST",
+    body: JSON.stringify(tarea),
+  });
 
-  const response = await fetch(
-    `${API_URL}/tareas?token=${token}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(tarea),
-    }
-  );
-
-  if (response.status === 401) {
-  localStorage.removeItem("token");
-  window.location.href = "/";
-  return;
-}
   return await response.json();
 };
 
 // 🔹 COMPLETAR TAREA
 export const completarTarea = async (id) => {
-  const token = localStorage.getItem("token");
-
-  const response = await fetch(
-    `${API_URL}/tareas/${id}/completar?token=${token}`,
-    {
-      method: "POST",
-    }
-  );
+  const response = await apiFetch(`${API_URL}/tareas/${id}/completar`, {
+    method: "POST",
+  });
 
   if (!response.ok) {
     throw new Error("Error al completar tarea");
@@ -77,22 +79,12 @@ export const completarTarea = async (id) => {
   return await response.json();
 };
 
+// 🔹 ACTUALIZAR TAREA
 export const actualizarTarea = async (id, datos) => {
-  const token = localStorage.getItem("token");
-
-  const response = await fetch(`${API_URL}/tareas/${id}?token=${token}`, {
+  const response = await apiFetch(`${API_URL}/tareas/${id}`, {
     method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
     body: JSON.stringify(datos),
   });
-
-  if (response.status === 401) {
-    localStorage.removeItem("token");
-    window.location.href = "/";
-    return;
-  }
 
   if (!response.ok) {
     throw new Error("Error al actualizar tarea");
@@ -101,6 +93,7 @@ export const actualizarTarea = async (id, datos) => {
   return await response.json();
 };
 
+// 🔹 REGISTRO (no usa token)
 export const registrarUsuario = async (datos) => {
   const response = await fetch(`${API_URL}/registro`, {
     method: "POST",
@@ -117,15 +110,11 @@ export const registrarUsuario = async (datos) => {
   return await response.json();
 };
 
+// 🔹 ELIMINAR TAREA
 export const eliminarTarea = async (id) => {
-  const token = localStorage.getItem("token");
-
-  const response = await fetch(
-    `${API_URL}/tareas/${id}?token=${token}`,
-    {
-      method: "DELETE",
-    }
-  );
+  const response = await apiFetch(`${API_URL}/tareas/${id}`, {
+    method: "DELETE",
+  });
 
   if (response.status === 404) {
     console.log("Tarea ya eliminada o no existe");

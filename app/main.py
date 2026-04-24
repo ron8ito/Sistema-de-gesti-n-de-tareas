@@ -142,8 +142,10 @@ def inicio():
 # =========================
 
 @app.get("/tareas")
-def obtener_tareas(token: str = Query(...)):
+def obtener_tareas(request: Request):
+    token = obtener_token(request)
     usuario_id = verificar_token(token)
+
     db = SessionLocal()
 
     result = db.execute(
@@ -164,7 +166,6 @@ def obtener_tareas(token: str = Query(...)):
 
     db.close()
     return tareas
-
 
 @app.post("/tareas")
 def crear_tarea(tarea: Tarea, request: Request):
@@ -198,18 +199,26 @@ def crear_tarea(tarea: Tarea, request: Request):
 
 
 @app.post("/tareas/{tarea_id}/completar")
-def completar_tarea(tarea_id: int, token: str = Query(...)):
+def completar_tarea(tarea_id: int, request: Request):
+    token = obtener_token(request)
     usuario_id = verificar_token(token)
     db = SessionLocal()
 
     try:
-        db.execute(text("""
+        result = db.execute(text("""
             UPDATE tareas
             SET estado = 'completada'
             WHERE id = :id AND usuario_id = :usuario_id
         """), {"id": tarea_id, "usuario_id": usuario_id})
 
         db.commit()
+
+        # 🔥 AQUÍ VA LA MEJORA
+        if result.rowcount == 0:
+            raise HTTPException(404, "Tarea no encontrada")
+
+    except HTTPException:
+        raise
 
     except Exception:
         db.rollback()
@@ -222,11 +231,10 @@ def completar_tarea(tarea_id: int, token: str = Query(...)):
 
 
 @app.put("/tareas/{id}")
-def actualizar_tarea(id: int, tarea: TareaUpdate, token: str = Query(None)):
-    if not token:
-        raise HTTPException(401, "No autorizado")
-
+def actualizar_tarea(id: int, tarea: TareaUpdate, request: Request):
+    token = obtener_token(request)
     usuario_id = verificar_token(token)
+
     db = SessionLocal()
 
     try:
@@ -271,15 +279,14 @@ def actualizar_tarea(id: int, tarea: TareaUpdate, token: str = Query(None)):
     finally:
         db.close()
 
-    return {"mensaje": "Tarea actualizada"}
+    return {"mensaje": "Tarea actualizada"}}
 
 
 @app.delete("/tareas/{id}")
-def eliminar_tarea(id: int, token: str = Query(None)):
-    if not token:
-        raise HTTPException(401, "No autorizado")
-
+def eliminar_tarea(id: int, request: Request):
+    token = obtener_token(request)
     usuario_id = verificar_token(token)
+
     db = SessionLocal()
 
     try:
@@ -304,7 +311,6 @@ def eliminar_tarea(id: int, token: str = Query(None)):
         db.close()
 
     return {"mensaje": "Tarea eliminada"}
-
 
 # =========================
 # AUTH
