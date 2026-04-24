@@ -1,8 +1,8 @@
-from fastapi import FastAPI, Query, Header, HTTPException
+from fastapi import FastAPI, Query, Header, HTTPException, RequestS
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy import text
-from jose import jwt
+from jose import jwt, JWTError, ExpiredSignatureError
 from datetime import datetime, timedelta
 from app.database.connection import SessionLocal, engine, Base
 from typing import Optional
@@ -70,10 +70,17 @@ def obtener_tareas(token: str = Query(...)):
     return tareas
 
 # 🔹 POST
-@app.post("/tareas")
-def crear_tarea(tarea: Tarea, token: str = Query(...)):
 
+
+@app.post("/tareas")
+def crear_tarea(tarea: Tarea, request: Request):
+
+    # 🔐 Obtener token (query o header)
+    token = obtener_token(request)
+
+    # 🔐 Validar token
     usuario_id = verificar_token(token)
+
     db = SessionLocal()
 
     try:
@@ -90,7 +97,7 @@ def crear_tarea(tarea: Tarea, token: str = Query(...)):
             "estado": tarea.estado
         }
 
-        print("INSERTANDO:", datos)  # 👈 para verificar
+        print("INSERTANDO:", datos)
 
         db.execute(text(query), datos)
         db.commit()
@@ -235,41 +242,59 @@ class Usuario(BaseModel):
     password: str
 
 import re
-
-from passlib.context import CryptContext
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-def hash_password(password: str):
-    return pwd_context.hash(password)
-
-def verify_password(plain_password: str, hashed_password: str):
-    return pwd_context.verify(plain_password, hashed_password)
+from fastapi import HTTPException
 
 def validar_password(password: str):
+    # 🔹 Mínimo de caracteres
     if len(password) < 8:
-        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres")
+        raise HTTPException(
+            status_code=400,
+            detail="La contraseña debe tener al menos 8 caracteres"
+        )
 
+    # 🔹 Límite de bcrypt (IMPORTANTE)
+    if len(password) > 72:
+        raise HTTPException(
+            status_code=400,
+            detail="La contraseña no puede tener más de 72 caracteres"
+        )
+
+    # 🔹 Al menos una letra
     if not re.search(r"[A-Za-z]", password):
-        raise HTTPException(status_code=400, detail="Debe contener al menos una letra")
+        raise HTTPException(
+            status_code=400,
+            detail="Debe contener al menos una letra"
+        )
 
+    # 🔹 Al menos un carácter especial
     if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
-        raise HTTPException(status_code=400, detail="Debe contener al menos un carácter especial")
-    
+        raise HTTPException(
+            status_code=400,
+            detail="Debe contener al menos un carácter especial"
+        )
 
 @app.post("/registro")
 def registrar(usuario: Usuario):
-    print("🔥 NUEVA VERSION ACTIVA 🔥")  # 👈 para verificar deploy
-
-    # 🔐 Validar contraseña
     validar_password(usuario.password)
 
-    # 🔐 Hashear contraseña
     hashed_password = hash_password(usuario.password)
 
     db = SessionLocal()
 
     try:
+        # 🔍 Verificar si ya existe
+        query_check = "SELECT * FROM usuarios WHERE username = :username"
+        existing_user = db.execute(text(query_check), {
+            "username": usuario.username
+        }).fetchone()
+
+        if existing_user:
+            raise HTTPException(
+                status_code=400,
+                detail="El usuario ya existe"
+            )
+
+        # ✅ Insertar si no existe
         query = "INSERT INTO usuarios (username, password) VALUES (:username, :password)"
         db.execute(text(query), {
             "username": usuario.username,
@@ -277,6 +302,9 @@ def registrar(usuario: Usuario):
         })
 
         db.commit()
+
+    except HTTPException:
+        raise
 
     except Exception as e:
         db.rollback()
@@ -336,6 +364,64 @@ def login(usuario: Usuario):
         "mensaje": "Login exitoso",
         "access_token": token
     }
+
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
+
+GOOGLE_CLIENT_ID = "865802471208-afm6vp84nov5q9dlcutco3hdb4t0842m.apps.googleusercontent.com"
+
+@app.post("/google-login")
+def google_login(data: dict):
+    token = data.get("credential")
+
+    if not token:
+        raise HTTPException(status_code=400, detail="Token requerido")
+
+    try:
+        # 🔐 Verificar token con Google
+        idinfo = id_token.verify_oauth2_token(
+            token,
+            google_requests.Request(),
+            GOOGLE_CLIENT_ID
+        )
+
+        email = idinfo.get("email")
+
+        if not email:
+            raise HTTPException(status_code=400, detail="Email no encontrado")
+
+        db = SessionLocal()
+
+        # 🔍 Buscar usuario
+        query = "SELECT * FROM usuarios WHERE username = :username"
+        user = db.execute(text(query), {"username": email}).fetchone()
+
+        # 👤 Si no existe → crear
+        if not user:
+            db.execute(text("""
+                INSERT INTO usuarios (username, password)
+                VALUES (:username, :password)
+            """), {
+                "username": email,
+                "password": "google_user"
+            })
+            db.commit()
+
+            user = db.execute(text(query), {"username": email}).fetchone()
+
+        db.close()
+
+        # 🎟️ Crear TU token JWT
+        token_jwt = crear_token({"user_id": user[0]})
+
+        return {
+            "access_token": token_jwt,
+            "token_type": "bearer"
+        }
+
+    except Exception as e:
+        print("ERROR GOOGLE:", e)
+        raise HTTPException(status_code=401, detail="Token inválido")
     
 SECRET_KEY = "mi_clave_secreta"
 ALGORITHM = "HS256"
@@ -343,16 +429,45 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 def crear_token(data: dict):
     to_encode = data.copy()
+    
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
+    
+    to_encode.update({
+        "exp": expire,
+        "type": "access"
+    })
+
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 def verificar_token(token: str):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        print("PAYLOAD:", payload)
-        return payload["user_id"]
-    except Exception as e:
-        print("ERROR TOKEN:", e)  # 👈 CLAVE
+        
+        user_id = payload.get("user_id")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Token inválido")
+
+        return user_id
+
+    except ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expirado")
+
+    except JWTError:
         raise HTTPException(status_code=401, detail="Token inválido")
     
+    from fastapi import Request
+
+def obtener_token(request: Request):
+    # 🔹 1. Query param (lo actual)
+    token = request.query_params.get("token")
+
+    # 🔹 2. Header Authorization (nuevo)
+    if not token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+
+    if not token:
+        raise HTTPException(status_code=401, detail="Token requerido")
+
+    return token

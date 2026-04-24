@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { loginUser } from "../Services/api";
+import { GoogleLogin } from "@react-oauth/google";
 
 function Login({ cambiarVista }) {
   const [username, setUsername] = useState("");
@@ -14,6 +15,36 @@ function Login({ cambiarVista }) {
     } catch (error) {
       console.error(error);
       alert("Error en login");
+    }
+  };
+
+  const handleGoogleLogin = async (credentialResponse) => {
+    try {
+      const res = await fetch(
+        "https://sistema-de-gesti-n-de-tareas-bgsu.onrender.com/google-login", // 👉 cambia luego a tu URL de Render
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            credential: credentialResponse.credential,
+          }),
+        }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.detail || "Error en Google login");
+      }
+
+      localStorage.setItem("token", data.access_token);
+      cambiarVista("tareas");
+
+    } catch (error) {
+      console.error("Error Google login:", error);
+      alert("Error con Google");
     }
   };
 
@@ -37,6 +68,16 @@ function Login({ cambiarVista }) {
         />
 
         <button onClick={handleLogin}>Ingresar</button>
+
+        {/* 🔥 BOTÓN GOOGLE */}
+        <div style={{ marginTop: "15px" }}>
+          <GoogleLogin
+            onSuccess={handleGoogleLogin}
+            onError={() => {
+              console.log("Error con Google");
+            }}
+          />
+        </div>
 
         <button
           className="secondary"
