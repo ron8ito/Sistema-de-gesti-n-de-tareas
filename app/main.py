@@ -25,9 +25,19 @@ app.add_middleware(
 
 # 🔥 CREAR TABLAS AL INICIAR
 @app.on_event("startup")
-def startup():
+def startup():  
     Base.metadata.create_all(bind=engine)
-    
+
+from passlib.context import CryptContext
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def hash_password(password: str):
+    return pwd_context.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str):
+    return pwd_context.verify(plain_password, hashed_password)
+
 # 🔥 CORS
 app.add_middleware(
     CORSMiddleware,
@@ -82,13 +92,9 @@ def obtener_tareas(token: str = Query(...)):
 
 # 🔹 POST
 @app.post("/tareas")
-def crear_tarea(tarea: Tarea, token: str = Query(None)):
-
-    if not token:
-        raise HTTPException(status_code=401, detail="No autorizado")
+def crear_tarea(tarea: Tarea, token: str = Query(...)):
 
     usuario_id = verificar_token(token)
-
     db = SessionLocal()
 
     try:
@@ -97,18 +103,22 @@ def crear_tarea(tarea: Tarea, token: str = Query(None)):
         VALUES (:titulo, :usuario_id, :descripcion, :fecha_vencimiento, :estado)
         """
 
-        db.execute(text(query), {
+        datos = {
             "titulo": tarea.titulo,
             "usuario_id": usuario_id,
             "descripcion": tarea.descripcion,
             "fecha_vencimiento": tarea.fecha_vencimiento,
             "estado": tarea.estado
-        })
+        }
 
+        print("INSERTANDO:", datos)  # 👈 para verificar
+
+        db.execute(text(query), datos)
         db.commit()
 
-    except Exception:
+    except Exception as e:
         db.rollback()
+        print("ERROR:", e)
         raise HTTPException(status_code=500, detail="Error en base de datos")
 
     finally:
@@ -245,14 +255,32 @@ class Usuario(BaseModel):
     username: str
     password: str
 
+import re
+
+def validar_password(password: str):
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres")
+
+    if not re.search(r"[A-Za-z]", password):
+        raise HTTPException(status_code=400, detail="Debe contener al menos una letra")
+
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+        raise HTTPException(status_code=400, detail="Debe contener al menos un carácter especial")
+
 @app.post("/registro")
 def registrar(usuario: Usuario):
+    # 🔐 Validar contraseña (nuevo)
+    validar_password(usuario.password)
+
+    # 🔐 Hashear contraseña (nuevo)
+    hashed_password = hash_password(usuario.password)
+
     db = SessionLocal()
 
     query = "INSERT INTO usuarios (username, password) VALUES (:username, :password)"
     db.execute(text(query), {
         "username": usuario.username,
-        "password": usuario.password
+        "password": hashed_password  # 👈 antes era texto plano
     })
 
     db.commit()
@@ -264,23 +292,50 @@ def registrar(usuario: Usuario):
 def login(usuario: Usuario):
     db = SessionLocal()
 
-    query = "SELECT * FROM usuarios WHERE username = :username AND password = :password"
+    query = "SELECT * FROM usuarios WHERE username = :username"
     result = db.execute(text(query), {
-        "username": usuario.username,
-        "password": usuario.password
+        "username": usuario.username
     }).fetchone()
+
+    if not result:
+        db.close()
+        raise HTTPException(status_code=401, detail="Credenciales incorrectas")
+
+    stored_password = result[2]  # id, username, password
+
+    # 🔐 Si es hash (nuevo sistema)
+    if stored_password.startswith("$2b$"):
+        if not verify_password(usuario.password, stored_password):
+            db.close()
+            raise HTTPException(status_code=401, detail="Credenciales incorrectas")
+
+    # 🧓 Si es texto plano (usuarios viejos)
+    else:
+        if usuario.password != stored_password:
+            db.close()
+            raise HTTPException(status_code=401, detail="Credenciales incorrectas")
+
+        # 🔥 Migración automática
+        new_hashed = hash_password(usuario.password)
+
+        db.execute(text("""
+            UPDATE usuarios 
+            SET password = :password 
+            WHERE id = :id
+        """), {
+            "password": new_hashed,
+            "id": result[0]
+        })
+        db.commit()
 
     db.close()
 
-    if result:
-        token = crear_token({"user_id": result[0]})
+    token = crear_token({"user_id": result[0]})
 
-        return {
-            "mensaje": "Login exitoso",
-            "access_token": token
-        }
-    else:
-        raise HTTPException(status_code=401, detail="Credenciales incorrectas")
+    return {
+        "mensaje": "Login exitoso",
+        "access_token": token
+    }
     
     
 SECRET_KEY = "mi_clave_secreta"
@@ -302,38 +357,14 @@ def verificar_token(token: str):
         print("ERROR TOKEN:", e)  # 👈 CLAVE
         raise HTTPException(status_code=401, detail="Token inválido")
     
+import re
 
-@app.post("/tareas")
-def crear_tarea(tarea: Tarea, token: str = Query(...)):
+def validar_password(password: str):
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres")
 
-    usuario_id = verificar_token(token)
-    db = SessionLocal()
+    if not re.search(r"[A-Za-z]", password):
+        raise HTTPException(status_code=400, detail="Debe contener al menos una letra")
 
-    try:
-        query = """
-        INSERT INTO tareas (titulo, usuario_id, descripcion, fecha_vencimiento, estado)
-        VALUES (:titulo, :usuario_id, :descripcion, :fecha_vencimiento, :estado)
-        """
-
-        datos = {
-            "titulo": tarea.titulo,
-            "usuario_id": usuario_id,
-            "descripcion": tarea.descripcion,
-            "fecha_vencimiento": tarea.fecha_vencimiento,
-            "estado": tarea.estado
-        }
-
-        print("INSERTANDO:", datos)  # 👈 para verificar
-
-        db.execute(text(query), datos)
-        db.commit()
-
-    except Exception as e:
-        db.rollback()
-        print("ERROR:", e)
-        raise HTTPException(status_code=500, detail="Error en base de datos")
-
-    finally:
-        db.close()
-
-    return {"mensaje": "Tarea creada"}
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+        raise HTTPException(status_code=400, detail="Debe contener al menos un carácter especial")
