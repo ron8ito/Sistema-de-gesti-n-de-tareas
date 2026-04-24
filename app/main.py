@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query, Header, HTTPException, RequestS
+from fastapi import FastAPI, Query, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy import text
@@ -6,12 +6,16 @@ from jose import jwt, JWTError, ExpiredSignatureError
 from datetime import datetime, timedelta
 from app.database.connection import SessionLocal, engine, Base
 from typing import Optional
+import re
 
-# 🔥 IMPORTAR MODELOS (ANTES DE CREAR LA APP)
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
+
+# 🔥 IMPORTAR MODELOS
 import app.models.user
 import app.models.task
 
-# 🔥 CREAR APP
+# 🔥 APP
 app = FastAPI()
 
 # 🔥 CORS
@@ -23,37 +27,129 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 🔥 CREAR TABLAS AL INICIAR
+# 🔥 DB INIT
 @app.on_event("startup")
 def startup():  
     Base.metadata.create_all(bind=engine)
+
+
+# =========================
+# MODELOS
+# =========================
 
 class Tarea(BaseModel):
     titulo: str
     descripcion: str
     fecha_vencimiento: str
     estado: str
-     
+
 class TareaUpdate(BaseModel):
     titulo: Optional[str] = None
     descripcion: Optional[str] = None
     fecha_vencimiento: Optional[datetime] = None
     estado: Optional[str] = None
 
+class Usuario(BaseModel):
+    username: str
+    password: str
+
+
+# =========================
+# CONFIG JWT
+# =========================
+
+SECRET_KEY = "mi_clave_secreta"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+def crear_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire, "type": "access"})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def verificar_token(token: str):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+
+        user_id = payload.get("user_id")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Token inválido")
+
+        return user_id
+
+    except ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expirado")
+
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token inválido")
+
+
+def obtener_token(request: Request):
+    token = request.query_params.get("token")
+
+    if not token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+
+    if not token:
+        raise HTTPException(status_code=401, detail="Token requerido")
+
+    return token
+
+
+# =========================
+# PASSWORD
+# =========================
+
+def validar_password(password: str):
+    if len(password) < 8:
+        raise HTTPException(400, "La contraseña debe tener al menos 8 caracteres")
+
+    if len(password) > 72:
+        raise HTTPException(400, "La contraseña no puede tener más de 72 caracteres")
+
+    if not re.search(r"[A-Za-z]", password):
+        raise HTTPException(400, "Debe contener al menos una letra")
+
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+        raise HTTPException(400, "Debe contener al menos un carácter especial")
+
+
+from passlib.context import CryptContext
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def hash_password(password: str):
+    return pwd_context.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str):
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+# =========================
+# ENDPOINTS BASE
+# =========================
 
 @app.get("/")
 def inicio():
     return {"mensaje": "Hola mundo"}
 
-# 🔹 GET
+
+# =========================
+# TAREAS
+# =========================
+
 @app.get("/tareas")
 def obtener_tareas(token: str = Query(...)):
-
     usuario_id = verificar_token(token)
     db = SessionLocal()
 
-    query = "SELECT * FROM tareas WHERE usuario_id = :usuario_id"
-    result = db.execute(text(query), {"usuario_id": usuario_id}).fetchall()
+    result = db.execute(
+        text("SELECT * FROM tareas WHERE usuario_id = :usuario_id"),
+        {"usuario_id": usuario_id}
+    ).fetchall()
 
     tareas = []
     for row in result:
@@ -69,91 +165,71 @@ def obtener_tareas(token: str = Query(...)):
     db.close()
     return tareas
 
-# 🔹 POST
-
 
 @app.post("/tareas")
 def crear_tarea(tarea: Tarea, request: Request):
-
-    # 🔐 Obtener token (query o header)
     token = obtener_token(request)
-
-    # 🔐 Validar token
     usuario_id = verificar_token(token)
 
     db = SessionLocal()
 
     try:
-        query = """
-        INSERT INTO tareas (titulo, usuario_id, descripcion, fecha_vencimiento, estado)
-        VALUES (:titulo, :usuario_id, :descripcion, :fecha_vencimiento, :estado)
-        """
-
-        datos = {
+        db.execute(text("""
+            INSERT INTO tareas (titulo, usuario_id, descripcion, fecha_vencimiento, estado)
+            VALUES (:titulo, :usuario_id, :descripcion, :fecha_vencimiento, :estado)
+        """), {
             "titulo": tarea.titulo,
             "usuario_id": usuario_id,
             "descripcion": tarea.descripcion,
             "fecha_vencimiento": tarea.fecha_vencimiento,
             "estado": tarea.estado
-        }
+        })
 
-        print("INSERTANDO:", datos)
-
-        db.execute(text(query), datos)
         db.commit()
 
     except Exception as e:
         db.rollback()
-        print("ERROR:", e)
-        raise HTTPException(status_code=500, detail="Error en base de datos")
+        raise HTTPException(500, "Error en base de datos")
 
     finally:
         db.close()
 
     return {"mensaje": "Tarea creada"}
 
+
 @app.post("/tareas/{tarea_id}/completar")
 def completar_tarea(tarea_id: int, token: str = Query(...)):
-
     usuario_id = verificar_token(token)
     db = SessionLocal()
 
     try:
-        query = """
-        UPDATE tareas
-        SET estado = 'completada'
-        WHERE id = :id AND usuario_id = :usuario_id
-        """
-
-        db.execute(text(query), {
-            "id": tarea_id,
-            "usuario_id": usuario_id
-        })
+        db.execute(text("""
+            UPDATE tareas
+            SET estado = 'completada'
+            WHERE id = :id AND usuario_id = :usuario_id
+        """), {"id": tarea_id, "usuario_id": usuario_id})
 
         db.commit()
 
     except Exception:
         db.rollback()
-        raise HTTPException(status_code=500, detail="Error al completar tarea")
+        raise HTTPException(500, "Error al completar tarea")
 
     finally:
         db.close()
 
     return {"mensaje": "Tarea completada"}
 
-# 🔹 PUT (actualizar)
+
 @app.put("/tareas/{id}")
 def actualizar_tarea(id: int, tarea: TareaUpdate, token: str = Query(None)):
-
     if not token:
-        raise HTTPException(status_code=401, detail="No autorizado")
+        raise HTTPException(401, "No autorizado")
 
     usuario_id = verificar_token(token)
-
     db = SessionLocal()
 
     try:
-        #QUERY
         campos = []
         valores = {"id": id, "usuario_id": usuario_id}
 
@@ -174,7 +250,7 @@ def actualizar_tarea(id: int, tarea: TareaUpdate, token: str = Query(None)):
             valores["estado"] = tarea.estado
 
         if not campos:
-            raise HTTPException(status_code=400, detail="No hay datos para actualizar")
+            raise HTTPException(400, "No hay datos para actualizar")
 
         query = f"""
         UPDATE tareas 
@@ -183,53 +259,46 @@ def actualizar_tarea(id: int, tarea: TareaUpdate, token: str = Query(None)):
         """
 
         result = db.execute(text(query), valores)
-
         db.commit()
 
         if result.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Tarea no encontrada")
+            raise HTTPException(404, "Tarea no encontrada")
 
     except Exception:
         db.rollback()
-        raise HTTPException(status_code=500, detail="Error en base de datos")
+        raise HTTPException(500, "Error en base de datos")
 
     finally:
         db.close()
 
     return {"mensaje": "Tarea actualizada"}
 
-# 🔹 DELETE (eliminar)
+
 @app.delete("/tareas/{id}")
 def eliminar_tarea(id: int, token: str = Query(None)):
-
     if not token:
-        raise HTTPException(status_code=401, detail="No autorizado")
+        raise HTTPException(401, "No autorizado")
 
     usuario_id = verificar_token(token)
-
     db = SessionLocal()
 
     try:
-        query = "DELETE FROM tareas WHERE id = :id AND usuario_id = :usuario_id"
-
-        result = db.execute(text(query), {
-            "id": id,
-            "usuario_id": usuario_id
-        })
+        result = db.execute(
+            text("DELETE FROM tareas WHERE id = :id AND usuario_id = :usuario_id"),
+            {"id": id, "usuario_id": usuario_id}
+        )
 
         db.commit()
 
         if result.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Tarea no encontrada")
+            raise HTTPException(404, "Tarea no encontrada")
 
-    # 👇 ESTE ES EL CAMBIO IMPORTANTE
     except HTTPException:
-        raise  # deja pasar errores como 404 o 401
+        raise
 
     except Exception as e:
         db.rollback()
-        print("ERROR REAL:", e)
-        raise HTTPException(status_code=500, detail="Error en base de datos")
+        raise HTTPException(500, "Error en base de datos")
 
     finally:
         db.close()
@@ -237,66 +306,30 @@ def eliminar_tarea(id: int, token: str = Query(None)):
     return {"mensaje": "Tarea eliminada"}
 
 
-class Usuario(BaseModel):
-    username: str
-    password: str
-
-import re
-from fastapi import HTTPException
-
-def validar_password(password: str):
-    # 🔹 Mínimo de caracteres
-    if len(password) < 8:
-        raise HTTPException(
-            status_code=400,
-            detail="La contraseña debe tener al menos 8 caracteres"
-        )
-
-    # 🔹 Límite de bcrypt (IMPORTANTE)
-    if len(password) > 72:
-        raise HTTPException(
-            status_code=400,
-            detail="La contraseña no puede tener más de 72 caracteres"
-        )
-
-    # 🔹 Al menos una letra
-    if not re.search(r"[A-Za-z]", password):
-        raise HTTPException(
-            status_code=400,
-            detail="Debe contener al menos una letra"
-        )
-
-    # 🔹 Al menos un carácter especial
-    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
-        raise HTTPException(
-            status_code=400,
-            detail="Debe contener al menos un carácter especial"
-        )
+# =========================
+# AUTH
+# =========================
 
 @app.post("/registro")
 def registrar(usuario: Usuario):
     validar_password(usuario.password)
-
     hashed_password = hash_password(usuario.password)
 
     db = SessionLocal()
 
     try:
-        # 🔍 Verificar si ya existe
-        query_check = "SELECT * FROM usuarios WHERE username = :username"
-        existing_user = db.execute(text(query_check), {
-            "username": usuario.username
-        }).fetchone()
+        existing = db.execute(
+            text("SELECT * FROM usuarios WHERE username = :username"),
+            {"username": usuario.username}
+        ).fetchone()
 
-        if existing_user:
-            raise HTTPException(
-                status_code=400,
-                detail="El usuario ya existe"
-            )
+        if existing:
+            raise HTTPException(400, "El usuario ya existe")
 
-        # ✅ Insertar si no existe
-        query = "INSERT INTO usuarios (username, password) VALUES (:username, :password)"
-        db.execute(text(query), {
+        db.execute(text("""
+            INSERT INTO usuarios (username, password)
+            VALUES (:username, :password)
+        """), {
             "username": usuario.username,
             "password": hashed_password
         })
@@ -308,65 +341,59 @@ def registrar(usuario: Usuario):
 
     except Exception as e:
         db.rollback()
-        print("ERROR REGISTRO:", e)
-        raise HTTPException(status_code=500, detail="Error al crear usuario")
+        raise HTTPException(500, "Error al crear usuario")
 
     finally:
         db.close()
 
     return {"mensaje": "Usuario creado"}
 
+
 @app.post("/login")
 def login(usuario: Usuario):
     db = SessionLocal()
 
-    query = "SELECT * FROM usuarios WHERE username = :username"
-    result = db.execute(text(query), {
-        "username": usuario.username
-    }).fetchone()
+    result = db.execute(
+        text("SELECT * FROM usuarios WHERE username = :username"),
+        {"username": usuario.username}
+    ).fetchone()
 
     if not result:
         db.close()
-        raise HTTPException(status_code=401, detail="Credenciales incorrectas")
+        raise HTTPException(401, "Credenciales incorrectas")
 
-    stored_password = result[2]  # id, username, password
+    stored_password = result[2]
 
-    # 🔐 Si es hash (nuevo sistema)
     if stored_password.startswith("$2b$"):
         if not verify_password(usuario.password, stored_password):
             db.close()
-            raise HTTPException(status_code=401, detail="Credenciales incorrectas")
-
-    # 🧓 Si es texto plano (usuarios viejos)
+            raise HTTPException(401, "Credenciales incorrectas")
     else:
         if usuario.password != stored_password:
             db.close()
-            raise HTTPException(status_code=401, detail="Credenciales incorrectas")
+            raise HTTPException(401, "Credenciales incorrectas")
 
-        # 🔥 Migración automática
         new_hashed = hash_password(usuario.password)
-
         db.execute(text("""
-            UPDATE usuarios 
-            SET password = :password 
-            WHERE id = :id
-        """), {
-            "password": new_hashed,
-            "id": result[0]
-        })
+            UPDATE usuarios SET password = :password WHERE id = :id
+        """), {"password": new_hashed, "id": result[0]})
         db.commit()
 
     db.close()
 
     token = crear_token({"user_id": result[0]})
 
-    return {
-        "mensaje": "Login exitoso",
-        "access_token": token
-    }
+    return {"access_token": token}
 
-from google.oauth2 import id_token
-from google.auth.transport import requests as google_requests
+print("LLEGUE AQUI")
+
+@app.get("/test-google")
+def test_google():
+    return {"ok": True}
+
+# =========================
+# GOOGLE LOGIN
+# =========================
 
 GOOGLE_CLIENT_ID = "865802471208-afm6vp84nov5q9dlcutco3hdb4t0842m.apps.googleusercontent.com"
 
@@ -375,10 +402,9 @@ def google_login(data: dict):
     token = data.get("credential")
 
     if not token:
-        raise HTTPException(status_code=400, detail="Token requerido")
+        raise HTTPException(400, "Token requerido")
 
     try:
-        # 🔐 Verificar token con Google
         idinfo = id_token.verify_oauth2_token(
             token,
             google_requests.Request(),
@@ -387,16 +413,13 @@ def google_login(data: dict):
 
         email = idinfo.get("email")
 
-        if not email:
-            raise HTTPException(status_code=400, detail="Email no encontrado")
-
         db = SessionLocal()
 
-        # 🔍 Buscar usuario
-        query = "SELECT * FROM usuarios WHERE username = :username"
-        user = db.execute(text(query), {"username": email}).fetchone()
+        user = db.execute(
+            text("SELECT * FROM usuarios WHERE username = :username"),
+            {"username": email}
+        ).fetchone()
 
-        # 👤 Si no existe → crear
         if not user:
             db.execute(text("""
                 INSERT INTO usuarios (username, password)
@@ -407,67 +430,17 @@ def google_login(data: dict):
             })
             db.commit()
 
-            user = db.execute(text(query), {"username": email}).fetchone()
+            user = db.execute(
+                text("SELECT * FROM usuarios WHERE username = :username"),
+                {"username": email}
+            ).fetchone()
 
         db.close()
 
-        # 🎟️ Crear TU token JWT
         token_jwt = crear_token({"user_id": user[0]})
 
-        return {
-            "access_token": token_jwt,
-            "token_type": "bearer"
-        }
+        return {"access_token": token_jwt}
 
     except Exception as e:
         print("ERROR GOOGLE:", e)
-        raise HTTPException(status_code=401, detail="Token inválido")
-    
-SECRET_KEY = "mi_clave_secreta"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
-def crear_token(data: dict):
-    to_encode = data.copy()
-    
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    
-    to_encode.update({
-        "exp": expire,
-        "type": "access"
-    })
-
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-
-def verificar_token(token: str):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        
-        user_id = payload.get("user_id")
-        if user_id is None:
-            raise HTTPException(status_code=401, detail="Token inválido")
-
-        return user_id
-
-    except ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expirado")
-
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Token inválido")
-    
-    from fastapi import Request
-
-def obtener_token(request: Request):
-    # 🔹 1. Query param (lo actual)
-    token = request.query_params.get("token")
-
-    # 🔹 2. Header Authorization (nuevo)
-    if not token:
-        auth_header = request.headers.get("Authorization")
-        if auth_header and auth_header.startswith("Bearer "):
-            token = auth_header.split(" ")[1]
-
-    if not token:
-        raise HTTPException(status_code=401, detail="Token requerido")
-
-    return token
+        raise HTTPException(401, "Token inválido")

@@ -6,22 +6,31 @@ function Login({ cambiarVista }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
+  // 🔐 LOGIN NORMAL
   const handleLogin = async () => {
     try {
       const data = await loginUser(username, password);
+
       localStorage.setItem("token", data.access_token);
+
       cambiarVista("tareas");
       alert("Login exitoso");
+
     } catch (error) {
-      console.error(error);
-      alert("Error en login");
+      console.error("Error login:", error);
+      alert("Credenciales incorrectas");
     }
   };
 
+  // 🔥 LOGIN CON GOOGLE
   const handleGoogleLogin = async (credentialResponse) => {
     try {
+      if (!credentialResponse?.credential) {
+        throw new Error("No se recibió credential de Google");
+      }
+
       const res = await fetch(
-        "https://sistema-de-gesti-n-de-tareas-bgsu.onrender.com/google-login", // 👉 cambia luego a tu URL de Render
+        "https://sistema-de-gesti-n-de-tareas-bgsu.onrender.com/google-login",
         {
           method: "POST",
           headers: {
@@ -39,8 +48,11 @@ function Login({ cambiarVista }) {
         throw new Error(data.detail || "Error en Google login");
       }
 
+      // 🔐 Guardar token
       localStorage.setItem("token", data.access_token);
+
       cambiarVista("tareas");
+      alert("Login con Google exitoso");
 
     } catch (error) {
       console.error("Error Google login:", error);
@@ -69,12 +81,13 @@ function Login({ cambiarVista }) {
 
         <button onClick={handleLogin}>Ingresar</button>
 
-        {/* 🔥 BOTÓN GOOGLE */}
+        {/* 🔥 GOOGLE */}
         <div style={{ marginTop: "15px" }}>
           <GoogleLogin
             onSuccess={handleGoogleLogin}
             onError={() => {
               console.log("Error con Google");
+              alert("Error con Google");
             }}
           />
         </div>
