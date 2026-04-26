@@ -279,7 +279,7 @@ def actualizar_tarea(id: int, tarea: TareaUpdate, request: Request):
     finally:
         db.close()
 
-    return {"mensaje": "Tarea actualizada"}}
+    return {"mensaje": "Tarea actualizada"}
 
 
 @app.delete("/tareas/{id}")
