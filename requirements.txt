@@ -24,3 +24,4 @@ typing_extensions==4.15.0
 uvicorn==0.44.0
 google-auth==2.29.0
 requests==2.31.0
+python-dotenv
