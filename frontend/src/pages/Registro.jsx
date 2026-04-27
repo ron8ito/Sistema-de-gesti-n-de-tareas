@@ -1,12 +1,18 @@
+// =========================================================
+// COMPONENTE REGISTER (REGISTRO DE USUARIO)
+// =========================================================
+
 import { useState } from "react";
 import { registrarUsuario } from "../Services/api";
 
 function Register({ cambiarVista }) {
+
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
   const handleRegister = async () => {
     try {
+
       await registrarUsuario({
         username,
         password,
@@ -14,15 +20,21 @@ function Register({ cambiarVista }) {
 
       alert("Usuario creado correctamente");
       cambiarVista("login");
+
     } catch (error) {
-      console.error(error);
-      alert("Error al registrar usuario");
-    }
+
+      console.error("ERROR FRONTEND:", error);
+
+      console.log("ENTRÉ AL ERROR 🔥");
+      console.log("MENSAJE:", error.message);
+      alert("TEST ERROR");
+}
   };
 
   return (
     <div className="auth-wrapper">
       <div className="auth-card">
+
         <h2>Crear cuenta</h2>
 
         <input
@@ -39,7 +51,9 @@ function Register({ cambiarVista }) {
           onChange={(e) => setPassword(e.target.value)}
         />
 
-        <button onClick={handleRegister}>Registrarse</button>
+        <button onClick={handleRegister}>
+          Registrarse
+        </button>
 
         <button
           className="secondary"
@@ -47,6 +61,7 @@ function Register({ cambiarVista }) {
         >
           Volver al login
         </button>
+
       </div>
     </div>
   );

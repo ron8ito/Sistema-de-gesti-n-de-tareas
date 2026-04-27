@@ -1,15 +1,39 @@
+/* =========================================================
+   ESTILOS GENERALES (APP.CSS)
+   =========================================================
+   Este archivo define:
+   - Estilo global de la aplicación
+   - Diseño de formularios (login/registro)
+   - Estilo de tarjetas (tareas)
+   - Header y botones
+   - Layout general
+   ========================================================= */
+
+/* =========================
+   ESTILO GLOBAL
+   ========================= */
+
 body {
   margin: 0;
+
+  /* Fuente principal */
   font-family: Arial, sans-serif;
+
+  /* Fondo oscuro general */
   background: #0f172a; /* fondo oscuro bonito */
 }
 
+/* Aplica box-sizing a todos los elementos */
 * {
   box-sizing: border-box;
 }
 
+/* =========================
+   HEADER (BARRA SUPERIOR)
+   ========================= */
+
 .header {
-  width: 100%;              /* 🔥 ocupa todo */
+  width: 100%;              /* ocupa todo el ancho */
   padding: 25px 30px;
 
   background: #1e293b;
@@ -23,11 +47,13 @@ body {
   overflow: hidden;
   margin-bottom: 30px;
 
+  /* sombra + efecto glow */
   box-shadow: 
     0 4px 10px rgba(0, 0, 0, 0.2),
     0 0 10px rgba(0, 242, 255, 0.2);
 }
 
+/* Contenedor interno del header */
 .header-content {
   max-width: none;
   width: 100%;
@@ -36,14 +62,17 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-right: 5px; /* 👈 lo acerca más al borde */
+
+  padding-right: 5px; /* acerca al borde */
 }
 
+/* Asegura que el contenido esté sobre el efecto visual */
 .header > * {
   position: relative;
   z-index: 1;
 }
 
+/* Efecto de borde animado */
 .header::before {
   content: "";
   position: absolute;
@@ -59,6 +88,7 @@ body {
     #00f2ff
   );
 
+  /* efecto máscara */
   -webkit-mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
@@ -66,24 +96,35 @@ body {
   mask-composite: exclude;
 }
 
+/* Título del header */
 .header h1 {
   margin: 0;
   font-size: 31px;
   color: rgb(73, 255, 255);
+
   line-height: 1; 
   background: transparent;
   align-items: center; 
+
   transform: translateY(-2px);
 }
-  
+
+/* =========================
+   BOTÓN LOGOUT
+   ========================= */
+
 .logout-btn {
   background: #ef4444;
+
   padding: 0px 18px;
   height: 32px;
+
   display: inline-flex;
+  align-items: center;
+
   border-radius: 999px;
   font-size: 13px;
-  align-items: center;
+
   transform: translateY(-4px);  
   line-height: 1; 
 
@@ -92,16 +133,28 @@ body {
 
 .logout-btn:hover {
   background: #dc2626;
+
+  /* efecto hover */
   transform: scale(1.05);
 }
+
+
+/* =========================
+   CONTENEDOR GENERAL
+   ========================= */
 
 .container {
   max-width: 600px;
   margin: 40px auto;
-  padding: 0; /* 👈 importante */
 
-  background: transparent; /* 🔥 quitamos el fondo */
+  padding: 0;
+
+  background: transparent;
 }
+
+/* =========================
+   INPUTS
+   ========================= */
 
 input {
   width: 100%;
@@ -115,17 +168,23 @@ input {
   color: white;
 }
 
+/* placeholder gris */
 input::placeholder {
   color: #b0b0b0;
 }
 
+/* =========================
+   BOTONES GENERALES
+   ========================= */
+
 button {
   margin-top: 10px;
   padding: 10px 16px;
+
   border: none;
+  border-radius: 999px;
 
-  border-radius: 999px; /* 👈 SOLO cambia esto */
-
+  /* gradiente azul */
   background: linear-gradient(135deg, #00c6ff, #0072ff);
   color: white;
 
@@ -138,12 +197,19 @@ button {
 button:hover {
   background-color: #4562a0;
   opacity: 0.9;
+
+  /* animación */
   transform: scale(1.02);
 }
+
+/* =========================
+   TARJETAS (TAREAS)
+   ========================= */
 
 .card {
   border: none;
   border-radius: 12px;
+
   padding: 15px;
   margin-top: 15px;
 
@@ -154,58 +220,59 @@ button:hover {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.card p {
-  color: #000000;
-}
-
+/* texto de tarjetas */
+.card p,
 .card h3 {
   color: #000000;
 }
 
+/* efecto hover */
 .card:hover {
   transform: translateY(-3px);
   box-shadow: 0 6px 18px rgba(0,0,0,0.15);
 }
 
+/* botones dentro de tarjeta */
 .card button {
-  width: auto;          /* 👈 clave */
+  width: auto;
   padding: 8px 12px;
   font-size: 14px;
   margin-right: 8px;
 }
 
-  .btn-completar {
-    background-color: #4CAF50;
-  }
-
-  .btn-eliminar {
-    background-color: #f44336;
-  }
-
-  .btn-editar {
-    background-color: #ff9800;
-  }
+/* =========================
+   TÍTULOS
+   ========================= */
 
 h2 {
   text-align: center;
   margin-bottom: 20px;
-  background: transparent;  /* 👈 QUITA el fondo negro */
+
+  background: transparent;
   color: #000000;
-  position: static !important;   /* 👈 MUY IMPORTANTE */
+
+  position: static !important;
   margin: 0 0 20px 0;
 }
+
+/* =========================
+   FORMULARIOS
+   ========================= */
 
 .form-section {
   margin-bottom: 40px;
   padding: 15px;
+
   border-radius: 10px;
   background: #f8f9fad8;
 }
 
 .form-card {
   background: #f8f9fad8;
+
   padding: 28px;
   border-radius: 12px;
+
   margin-bottom: 35px;
 
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
@@ -217,16 +284,22 @@ h2 {
   margin-bottom: 20px;
 }
 
+/* =========================
+   SECCIÓN TAREAS
+   ========================= */
+
 .tareas-section {
   margin-top: 20px;
 }
 
+/* contenedor de tarjetas */
 .tareas-card {
-  background: transparent;   /* 👈 antes tenía gris */
-  padding: 0;                /* 👈 quita espacio interno */
-  border-radius: 0;          /* 👈 opcional pero ayuda */
-  box-shadow: none;          /* 👈 elimina sombra extra */
-  border: none;              /* 👈 elimina borde */
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+
+  box-shadow: none;
+  border: none;
 
   display: flex;
   flex-direction: column;
@@ -238,22 +311,31 @@ h2 {
   margin-bottom: 20px;
 }
 
+/* contenedor principal */
 .tareas-container {
   background: #e5e7eb;
+
   padding: 20px;
   border-radius: 12px;
 
   box-shadow: 0 4px 10px rgba(0,0,0,0.2);
 
-  margin-top: 10px; /* 👈 separación REAL */
-  text-align: center;
+  margin-top: 10px;
   margin-bottom: 15px;
+
+  text-align: center;
+
   color: #e5e7eb;
 }
+
+/* =========================
+   ESTADO VACÍO
+   ========================= */
 
 .empty-state {
   text-align: center;
   padding: 50px 20px;
+
   border-radius: 16px;
 
   background: rgba(255, 255, 255, 0.6);
@@ -280,21 +362,29 @@ h2 {
   color: #555;
 }
 
+/* =========================
+   LOGIN / REGISTRO (AUTH)
+   ========================= */
+
 .auth-wrapper {
   height: 100vh;
+
   display: flex;
   justify-content: center;
   align-items: center;
 
+  /* fondo degradado */
   background: linear-gradient(135deg, #0f172a, #020617);
 }
 
+/* tarjeta de login */
 .auth-card {
   width: 380px;
   padding: 35px;
 
   border-radius: 20px;
 
+  /* efecto glass */
   background: rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(10px);
 
@@ -310,6 +400,7 @@ h2 {
   color: white;
 }
 
+/* inputs dentro del auth */
 .auth-card input {
   width: 100%;
   margin-bottom: 15px;
@@ -322,6 +413,7 @@ h2 {
   color: white;
 }
 
+/* botón principal */
 .auth-card button {
   width: 100%;
   margin-top: 10px;
@@ -336,6 +428,7 @@ h2 {
   cursor: pointer;
 }
 
+/* botón secundario */
 .auth-card .secondary {
   background: transparent;
   border: 1px solid rgba(255,255,255,0.2);
