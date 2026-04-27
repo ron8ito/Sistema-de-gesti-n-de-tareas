@@ -23,12 +23,12 @@ function Register({ cambiarVista }) {
 
     } catch (error) {
 
-      console.error("ERROR FRONTEND:", error);
-
-      console.log("ENTRÉ AL ERROR 🔥");
+      console.log("ERROR COMPLETO:", error);
       console.log("MENSAJE:", error.message);
-      alert("TEST ERROR");
-}
+
+      // 🔥 ahora sí muestra el error real del backend
+      alert("ERROR: " + error.message);
+    }
   };
 
   return (
