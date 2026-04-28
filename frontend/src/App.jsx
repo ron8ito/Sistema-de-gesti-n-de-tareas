@@ -20,6 +20,7 @@ import { useState, useEffect } from "react";
 import Login from "./pages/Login";
 import Registro from "./pages/Registro";
 import Tareas from "./pages/Tareas";
+import { Toaster } from 'react-hot-toast';
 
 // Estilos globales
 import "./App.css";
@@ -34,8 +35,6 @@ function App() {
   // ESTADO DE NAVEGACIÓN
   // =========================
 
-  // Controla qué pantalla se muestra:
-  // "login" | "registro" | "tareas"
   const [vista, setVista] = useState("login");
 
   // =========================
@@ -43,18 +42,13 @@ function App() {
   // =========================
 
   const cambiarVista = (nuevaVista) => {
-
-    // Obtiene token del navegador
     const token = localStorage.getItem("token");
 
-    // 🔐 PROTECCIÓN DE RUTA
-    // Si intenta entrar a "tareas" sin token → lo manda a login
     if (nuevaVista === "tareas" && !token) {
       setVista("login");
       return;
     }
 
-    // Cambia la vista normalmente
     setVista(nuevaVista);
   };
 
@@ -63,15 +57,11 @@ function App() {
   // =========================
 
   useEffect(() => {
-
-    // Revisa si ya hay token guardado
     const token = localStorage.getItem("token");
 
-    // Si existe → entra directo a tareas
     if (token) {
       setVista("tareas");
     }
-
   }, []);
 
   // =========================
@@ -81,22 +71,18 @@ function App() {
   console.log("VISTA ACTUAL:", vista);
 
   // =========================
-  // RENDER CONDICIONAL
+  // RENDER CON TOASTER INCLUIDO
   // =========================
 
-  // Dependiendo del estado "vista", muestra un componente distinto
+  return (
+    <>
+      <Toaster position="top-right" />
 
-  if (vista === "login") {
-    return <Login cambiarVista={cambiarVista} />;
-  }
-
-  if (vista === "registro") {
-    return <Registro cambiarVista={cambiarVista} />;
-  }
-
-  if (vista === "tareas") {
-    return <Tareas cambiarVista={cambiarVista} />;
-  }
+      {vista === "login" && <Login cambiarVista={cambiarVista} />}
+      {vista === "registro" && <Registro cambiarVista={cambiarVista} />}
+      {vista === "tareas" && <Tareas cambiarVista={cambiarVista} />}
+    </>
+  );
 }
 
 // =========================

@@ -21,6 +21,9 @@ import { loginUser } from "../Services/api";
 // Componente oficial de login con Google
 import { GoogleLogin } from "@react-oauth/google";
 
+// 🔔 Librería para notificaciones
+import toast from 'react-hot-toast';
+
 // =========================
 // COMPONENTE PRINCIPAL
 // =========================
@@ -48,12 +51,15 @@ function Login({ cambiarVista }) {
 
       cambiarVista("tareas");
 
-      alert("Login exitoso");
+      // ✅ Reemplazo de alert por toast
+      toast.success("Login exitoso");
 
     } catch (error) {
 
       console.error("Error login:", error);
-      alert("Credenciales incorrectas");
+
+      // ✅ Reemplazo de alert por toast
+      toast.error("Credenciales incorrectas");
     }
   };
 
@@ -91,14 +97,14 @@ function Login({ cambiarVista }) {
 
       cambiarVista("tareas");
 
-      alert("Login con Google exitoso");
+      // ✅ Notificación de éxito
+      toast.success("Login exitoso");
 
     } catch (error) {
 
       console.error("Error Google login:", error);
 
-      // 🔥 ahora muestra el error real si viene del backend
-      alert(error.message || "Error con Google");
+      toast.error("Error al iniciar con Google");
     }
   };
 
@@ -136,12 +142,10 @@ function Login({ cambiarVista }) {
             onSuccess={handleGoogleLogin}
             onError={() => {
               console.log("Error con Google");
-              alert("Error con Google");
+              toast.error("Error con Google");
             }}
-
-            // 🔥 CLAVES PARA FORZAR SELECCIÓN DE CUENTA
-            useOneTap={false}
-            prompt="select_account"
+            useOneTap={false} // 🔥 Desactiva login automático problemático
+            prompt="select_account" // 🔥 Fuerza selección de cuenta
           />
         </div>
 
@@ -156,5 +160,9 @@ function Login({ cambiarVista }) {
     </div>
   );
 }
+
+// =========================
+// EXPORTACIÓN
+// =========================
 
 export default Login;

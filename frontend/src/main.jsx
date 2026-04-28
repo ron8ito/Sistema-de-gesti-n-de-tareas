@@ -28,6 +28,13 @@ import './index.css'
 import App from './App.jsx'
 
 // =========================
+// DEBUG VARIABLES DE ENTORNO
+// =========================
+
+// 🔥 ESTE ES EL IMPORTANTE
+console.log("CLIENT ID:", import.meta.env.VITE_GOOGLE_CLIENT_ID);
+
+// =========================
 // RENDER DE LA APLICACIÓN
 // =========================
 
